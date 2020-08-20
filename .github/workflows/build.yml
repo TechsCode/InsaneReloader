@@ -8,7 +8,6 @@ on:
 
 env:
   nmsVersion: "1.12.2"
-  build: build-${{ github.run_number }}
 
 jobs:
   build:
@@ -21,7 +20,7 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 1.8
-          
+
       - name: Cache NMS
         id: cache-nms
         uses: actions/cache@v1
@@ -38,9 +37,6 @@ jobs:
       - name: Install nms into m2
         run: mkdir -p $HOME/.m2/repository && cp -a nms-build/.m2/repository/* $HOME/.m2/repository
 
-      - name: Create ci.yml with Build Number
-        run: echo "${{ env.build }}" > ci.yml
-
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
@@ -48,13 +44,11 @@ jobs:
         run: ./gradlew build
         env:
           GITHUB_TOKEN: ${{ secrets.BASEPLUGIN_GITHUB_TOKEN }}
+          BUILD_NUMBER: ${{ github.run_number }}
 
-      - name: Retrieve Project Name
+      - name: Retrieve Project Name & Version
         run: |
           echo ::set-env name=projectName::$(echo "$GITHUB_REPOSITORY" | awk -F / '{print $2}' | sed -e "s/:refs//")
-        
-      - name: Retrieve Project Version
-        run: |
           echo ::set-env name=projectVersion::$(./gradlew properties | grep ^version: | cut -c 10-)
 
       - name: Create Release
@@ -63,8 +57,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ env.build }}
-          release_name: Release ${{ env.projectVersion }} ${{ env.build }}
+          tag_name: build-${{ github.run_number }}
+          release_name: Release ${{ env.projectVersion }} build-${{ github.run_number }}
           body: ${{ join(github.event.commits.*.message, ' || ') }}
 
       - name: Upload Release Asset
