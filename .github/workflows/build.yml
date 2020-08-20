@@ -22,12 +22,6 @@ jobs:
         with:
           java-version: 1.8
           
-      - name: Get Project Name
-        run: echo ::set-env name=name::$(echo "$GITHUB_REPOSITORY" | awk -F / '{print $2}' | sed -e "s/:refs//")
-
-      - name: Create ci.yml with Build Number
-        run: echo "${{ env.build }}" > ci.yml
-
       - name: Cache NMS
         id: cache-nms
         uses: actions/cache@v1
@@ -44,6 +38,9 @@ jobs:
       - name: Install nms into m2
         run: mkdir -p $HOME/.m2/repository && cp -a nms-build/.m2/repository/* $HOME/.m2/repository
 
+      - name: Create ci.yml with Build Number
+        run: echo "${{ env.build }}" > ci.yml
+
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
@@ -52,9 +49,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.BASEPLUGIN_GITHUB_TOKEN }}
 
+      - name: Retrieve Project Name
+        run: echo ::set-env name=projectName::$(echo "$GITHUB_REPOSITORY" | awk -F / '{print $2}' | sed -e "s/:refs//")
+        
       - name: Retrieve Project Version
-        run: |
-          echo ::set-env name=version::$(./gradlew properties | grep ^version: | cut -c 10-)
+        run: echo ::set-env name=projectVersion::$(./gradlew properties | grep ^version: | cut -c 10-)
 
       - name: Create Release
         id: create_release
@@ -63,7 +62,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ env.build }}
-          release_name: Release ${{ env.version }} ${{ env.build }}
+          release_name: Release ${{ env.projectVersion }} ${{ env.build }}
           body: ${{ join(github.event.commits.*.message, ' || ') }}
 
       - name: Upload Release Asset
@@ -73,6 +72,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: /build/${{ env.name }}.jar
-          asset_name: ${{ env.name }}.jar
+          asset_path: build/${{ env.projectName }}.jar
+          asset_name: ${{ env.projectName }}.jar
           asset_content_type: application/java-archive
