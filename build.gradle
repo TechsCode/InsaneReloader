@@ -1,0 +1,22 @@
+buildscript {
+    repositories {
+        maven { url "https://jitpack.io" }
+        jcenter()
+    }
+
+    dependencies {
+        classpath 'com.github.TechsCode:GradleBasePlugin:build-14'
+    }
+}
+
+apply plugin: 'java'
+apply plugin: 'me.TechsCode.GradleBasePlugin'
+
+meta {
+    version = "1.0.0"
+    baseVersion = "build-28"
+}
+
+compileJava {
+    options.encoding = "UTF-8"
+}
