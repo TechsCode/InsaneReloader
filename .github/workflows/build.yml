@@ -48,7 +48,7 @@ jobs:
 
       - name: Retrieve Project Name & Version
         run: |
-          echo ::set-env name=projectName::$(echo "$GITHUB_REPOSITORY" | awk -F / '{print $2}' | sed -e "s/:refs//")
+          echo ::set-env name=projectName::$(./gradlew properties | grep ^name: | cut -c 7-)
           echo ::set-env name=projectVersion::$(./gradlew properties | grep ^version: | cut -c 10-)
 
       - name: Create Release
