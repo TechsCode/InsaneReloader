@@ -1,0 +1,78 @@
+name: Build
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+env:
+  nmsVersion: "1.12.2"
+  build: build-${{ github.run_number }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up JDK 1.8
+        uses: actions/setup-java@v1
+        with:
+          java-version: 1.8
+          
+      - name: Get Project Name
+        run: echo ::set-env name=name::$(echo "$GITHUB_REPOSITORY" | awk -F / '{print $2}' | sed -e "s/:refs//")
+
+      - name: Create ci.yml with Build Number
+        run: echo "${{ env.build }}" > ci.yml
+
+      - name: Cache NMS
+        id: cache-nms
+        uses: actions/cache@v1
+        with:
+          path: nms-build/.m2/repository/
+          key: ${{ runner.os }}-${{ env.nmsVersion }}-nms
+
+      - name: Build NMS
+        if: steps.cache-nms.outputs.cache-hit != 'true'
+        uses: derongan/nmsaction@v1
+        with:
+          rev: ${{ env.nmsVersion }}
+
+      - name: Install nms into m2
+        run: mkdir -p $HOME/.m2/repository && cp -a nms-build/.m2/repository/* $HOME/.m2/repository
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build with Gradle
+        run: ./gradlew build
+        env:
+          GITHUB_TOKEN: ${{ secrets.BASEPLUGIN_GITHUB_TOKEN }}
+
+      - name: Retrieve Project Version
+        run: |
+          echo ::set-env name=version::$(./gradlew properties | grep ^version: | cut -c 10-)
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ env.build }}
+          release_name: Release ${{ env.version }} ${{ env.build }}
+          body: ${{ join(github.event.commits.*.message, ' || ') }}
+
+      - name: Upload Release Asset
+        id: upload-release-asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: /build/${{ env.name }}.jar
+          asset_name: ${{ env.name }}.jar
+          asset_content_type: application/java-archive
