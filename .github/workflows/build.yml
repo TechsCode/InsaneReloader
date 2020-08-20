@@ -50,10 +50,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.BASEPLUGIN_GITHUB_TOKEN }}
 
       - name: Retrieve Project Name
-        run: echo ::set-env name=projectName::$(echo "$GITHUB_REPOSITORY" | awk -F / '{print $2}' | sed -e "s/:refs//")
+        run: |
+          echo ::set-env name=projectName::$(echo "$GITHUB_REPOSITORY" | awk -F / '{print $2}' | sed -e "s/:refs//")
         
       - name: Retrieve Project Version
-        run: echo ::set-env name=projectVersion::$(./gradlew properties | grep ^version: | cut -c 10-)
+        run: |
+          echo ::set-env name=projectVersion::$(./gradlew properties | grep ^version: | cut -c 10-)
 
       - name: Create Release
         id: create_release
