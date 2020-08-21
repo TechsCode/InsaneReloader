@@ -14,7 +14,7 @@ apply plugin: 'me.TechsCode.GradleBasePlugin'
 
 meta {
     version = "1.0.0"
-    baseVersion = "build-28"
+    baseVersion = "build-42"
 }
 
 compileJava {
