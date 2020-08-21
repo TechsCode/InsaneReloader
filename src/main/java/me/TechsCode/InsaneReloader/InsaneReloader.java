@@ -2,32 +2,37 @@ package me.TechsCode.InsaneReloader;
 
 import me.TechsCode.base.SpigotTechPlugin;
 import org.bukkit.Bukkit;
-import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.server.PluginEnableEvent;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
 import java.util.HashMap;
-import java.util.Map;
 import java.util.Objects;
 
-public class InsaneReloader extends SpigotTechPlugin {
+public class InsaneReloader extends SpigotTechPlugin implements Listener {
 
-    private Map<File, Long> plugins;
+    private final HashMap<File, Long> plugins;
     private File updatingPlugin;
+
+    private boolean sendMsgs = false;
 
     public InsaneReloader(JavaPlugin plugin) {
         super(plugin);
+
+        Bukkit.getPluginManager().registerEvents(this, this.getBootstrap());
+        this.plugins = new HashMap<>();
+
+        getScheduler().runTaskLater(() -> sendMsgs = true, 200L);
     }
 
-    private void checkForChanges(){
-        if(plugins == null){
-            plugins = new HashMap<>();
-        }
+    private void checkForChanges() {
+        for (File pluginJar : Objects.requireNonNull(new File(getServerFolder().getAbsolutePath() + "/plugins").listFiles())) {
+            if (!pluginJar.getName().endsWith(".jar")) continue;
 
-        for(File pluginJar : Objects.requireNonNull(new File(getServerFolder().getAbsolutePath() + "/plugins").listFiles())){
-            if(!pluginJar.getName().endsWith(".jar")) continue;
-
-            if(!plugins.containsKey(pluginJar)){
+            if (!plugins.containsKey(pluginJar)) {
                 plugins.put(pluginJar, pluginJar.length());
                 continue;
             }
@@ -38,27 +43,55 @@ public class InsaneReloader extends SpigotTechPlugin {
             boolean updating = lastFileSize != fileSizeNow;
             plugins.put(pluginJar, fileSizeNow);
 
-            if(updatingPlugin != null && updatingPlugin.equals(pluginJar)){
-                if(!updating){
-                    onUpdatingComplete(pluginJar);
-                    updatingPlugin = null;
-                }
-            } else {
-                if(updating){
-                    updatingPlugin = pluginJar;
-                }
+            if (!updating && updatingPlugin != null && updatingPlugin.equals(pluginJar)) {
+                onUpdatingComplete(pluginJar);
+                updatingPlugin = null;
+            } else if(updating) {
+                updatingPlugin = pluginJar;
             }
         }
     }
 
-    private void onUpdatingComplete(File file){
-        String plugin = file.getName().replace(".jar", "");
+    private void onUpdatingComplete(File file) {
+        getScheduler().runTaskLater(() -> {
+            File updatedFile = new File(file.getAbsolutePath());
 
-        for(Player all : Bukkit.getOnlinePlayers()){
-            all.sendMessage(getPrefix()+"§7Plugin §e"+plugin+" §7just got updated");
-        }
+            if(updatedFile.length() == file.length()) {
+                String plugin = file.getName().replace(".jar", "");
 
-        getScheduler().runTaskLater(() -> Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "plugman reload "+plugin), 60);
+                Plugin loadedPlugin = getPluginByName(plugin);
+
+                sendToAll(updatedMessage(plugin));
+                if(loadedPlugin != null && loadedPlugin.isEnabled()) {
+                    Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "plugman reload " + plugin);
+                } else {
+                    Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "plugman load " + plugin);
+                }
+            }
+        }, 90);
+    }
+
+    public Plugin getPluginByName(String name) {
+        return Bukkit.getPluginManager().getPlugin(name);
+    }
+
+    @EventHandler
+    public void onPluginEnable(PluginEnableEvent e) {
+        if(!sendMsgs) return;
+
+        sendToAll(loadedMessage(e.getPlugin().getName()));
+    }
+
+    private String loadedMessage(String plugin) {
+        return getPrefix() + "§7The plugin §e" + plugin + " §7has §asuccessfully §7loaded!";
+    }
+
+    private String updatedMessage(String plugin) {
+        return getPrefix() + "§7The plugin §e" + plugin + " §7just got updated!";
+    }
+
+    public void sendToAll(String msg) {
+        Bukkit.getOnlinePlayers().forEach(all -> all.sendMessage(msg));
     }
 
     @Override
